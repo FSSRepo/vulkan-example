@@ -31,9 +31,12 @@ void main() {
 
     GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
 
-    VulkanInstance inst(true);
+    bool debug_app = true;
+
+    VulkanInstance inst(debug_app);
     inst.attach(window);
     inst.initializeDevice();
+
     VulkanSwapchain chain(inst);
     chain.initalize(WIDTH, HEIGHT, false);
 
