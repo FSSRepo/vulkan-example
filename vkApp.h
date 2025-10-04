@@ -46,7 +46,6 @@ class VulkanInstance {
 
 class VulkanSwapchain {
     private:
-    std::vector<VkImage> swapChainImages;
     VkFormat swapChainImageFormat;
     std::vector<VkImageView> swapChainImageViews;
     VulkanInstance inst;
@@ -61,6 +60,7 @@ class VulkanSwapchain {
     VkRenderPass renderPass;
     VkSwapchainKHR swapChain;
     VkExtent2D swapChainExtent;
+    std::vector<VkImage> swapChainImages;
 
     VkDevice device;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -95,13 +95,15 @@ class VulkanRenderer {
     VkQueue graphicsQueue;
     VkQueue presentQueue;
 
-    VulkanSwapchain& swapChain;
+    VulkanSwapchain swapChain;
 
     public:
     uint32_t currentFrame = 0;
     uint32_t imageIndex;
-    void initialize(VulkanInstance inst, VulkanSwapchain swap);
-    VkCommandBuffer begin(VulkanGraphicsPipeline pipeline, VkClearValue* clearVals);
+
+    VulkanRenderer(VulkanSwapchain swap) : swapChain(swap) {}
+    void initialize(VulkanInstance inst);
+    VkCommandBuffer begin(VulkanGraphicsPipeline pipeline, VkClearValue* clearVals, int clearCounts);
     void end();
 };
 
