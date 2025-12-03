@@ -104,4 +104,10 @@ void main() {
     }
 
     vkDeviceWaitIdle(inst.device);
+    renderer.destroy();
+    gpipe.destroy();
+    chain.destroy();
+    inst.destroy();
+    glfwDestroyWindow(window);
+    glfwTerminate();
 }

@@ -59,7 +59,13 @@
         "map": "cpp",
         "span": "cpp",
         "sstream": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "cstdarg": "cpp",
+        "functional": "cpp",
+        "iomanip": "cpp",
+        "list": "cpp",
+        "unordered_map": "cpp",
+        "xhash": "cpp"
     },
     "C_Cpp.default.includePath": [
         "C:\\VulkanSDK\\1.4.321.1\\Include",

@@ -1,6 +1,21 @@
 #include "vkApp.h"
 #include <iostream>
 #include <fstream>
+#include <cstring>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+static std::vector<unsigned char> load_png_rgba(const char* filename, int &outW, int &outH) {
+    int n;
+    unsigned char* data = stbi_load(filename, &outW, &outH, &n, STBI_rgb_alpha);
+    if (!data) {
+        throw std::runtime_error("failed to load image with stb_image");
+    }
+    std::vector<unsigned char> pixels((size_t)outW * (size_t)outH * 4);
+    std::memcpy(pixels.data(), data, pixels.size());
+    stbi_image_free(data);
+    return pixels;
+}
 
 #define WIDTH 1280
 #define HEIGHT 720
@@ -40,10 +55,11 @@ void main() {
     VulkanSwapchain chain(inst);
     chain.initalize(WIDTH, HEIGHT, false);
 
-    auto vertShaderCode = readFile("simple.vert.spv");
-    auto fragShaderCode = readFile("simple.frag.spv");
+    auto vertShaderCode = readFile("texture.vert.spv");
+    auto fragShaderCode = readFile("texture.frag.spv");
 
     VulkanGraphicsPipeline gpipe(chain, vertShaderCode, fragShaderCode);
+    gpipe.enableTexture();
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -77,6 +93,14 @@ void main() {
 
     gpipe.create(pipelineInfo);
 
+    int texWidth, texHeight;
+    auto pixels = load_png_rgba("texture.jpg", texWidth, texHeight);
+
+    VulkanTexture texture(inst);
+    texture.load(pixels.data(), texWidth, texHeight);
+
+    gpipe.createTextureDescriptor(texture);
+
     VulkanRenderer renderer(chain);
     renderer.initialize(inst);
 
@@ -99,9 +123,17 @@ void main() {
         scissor.extent = chain.swapChainExtent;
         vkCmdSetScissor(cmd, 0, 1, &scissor);
 
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, gpipe.pipelineLayout, 0, 1, &gpipe.descriptorSets[renderer.currentFrame], 0, nullptr);
         vkCmdDraw(cmd, 3, 1, 0, 0);
         renderer.end();
     }
 
     vkDeviceWaitIdle(inst.device);
+    texture.destroy();
+    renderer.destroy();
+    gpipe.destroy();
+    chain.destroy();
+    inst.destroy();
+    glfwDestroyWindow(window);
+    glfwTerminate();
 }

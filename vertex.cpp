@@ -1,6 +1,7 @@
 #include "vkApp.h"
 #include <iostream>
 #include <fstream>
+#include <cstddef>
 
 #define WIDTH 1280
 #define HEIGHT 720
@@ -23,6 +24,11 @@ static std::vector<char> readFile(const std::string& filename) {
     return buffer;
 }
 
+struct Vertex {
+    float position[2];
+    float uv[2];
+};
+
 void main() {
     glfwInit();
 
@@ -40,15 +46,41 @@ void main() {
     VulkanSwapchain chain(inst);
     chain.initalize(WIDTH, HEIGHT, false);
 
-    auto vertShaderCode = readFile("simple.vert.spv");
-    auto fragShaderCode = readFile("simple.frag.spv");
+    auto vertShaderCode = readFile("vertex.vert.spv");
+    auto fragShaderCode = readFile("vertex.frag.spv");
 
     VulkanGraphicsPipeline gpipe(chain, vertShaderCode, fragShaderCode);
 
+    std::vector<Vertex> vertices = {
+        {{0.0f, -0.5f}, {0.0f, 0.0f}},
+        {{0.5f,  0.5f}, {1.0f, 0.0f}},
+        {{-0.5f, 0.5f}, {0.0f, 1.0f}}
+    };
+
+    VulkanBuffer vbuf(inst);
+    vbuf.create(vertices.data(), static_cast<int>(vertices.size() * sizeof(Vertex)), false);
+
+    VkVertexInputBindingDescription bindingDescription{};
+    bindingDescription.binding = 0;
+    bindingDescription.stride = sizeof(Vertex);
+    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    VkVertexInputAttributeDescription attributeDescriptions[2];
+    attributeDescriptions[0].binding = 0;
+    attributeDescriptions[0].location = 0;
+    attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+    attributeDescriptions[0].offset = static_cast<uint32_t>(offsetof(Vertex, position));
+    attributeDescriptions[1].binding = 0;
+    attributeDescriptions[1].location = 1;
+    attributeDescriptions[1].format = VK_FORMAT_R32G32_SFLOAT;
+    attributeDescriptions[1].offset = static_cast<uint32_t>(offsetof(Vertex, uv));
+
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    vertexInputInfo.vertexAttributeDescriptionCount = 2;
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions;
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -99,9 +131,20 @@ void main() {
         scissor.extent = chain.swapChainExtent;
         vkCmdSetScissor(cmd, 0, 1, &scissor);
 
+        VkBuffer buffers[] = { vbuf.buffer };
+        VkDeviceSize offsets[] = { 0 };
+        vkCmdBindVertexBuffers(cmd, 0, 1, buffers, offsets);
+
         vkCmdDraw(cmd, 3, 1, 0, 0);
         renderer.end();
     }
 
     vkDeviceWaitIdle(inst.device);
+    renderer.destroy();
+    gpipe.destroy();
+    chain.destroy();
+    vbuf.destroy();
+    inst.destroy();
+    glfwDestroyWindow(window);
+    glfwTerminate();
 }

@@ -26,4 +26,7 @@ target_link_libraries(vulkan-depth PRIVATE glfw ${TARGET})
 add_executable(vulkan-3d cube.cpp)
 target_link_libraries(vulkan-3d PRIVATE glfw ${TARGET})
 
+add_executable(vulkan-proc postprocess.cpp)
+target_link_libraries(vulkan-proc PRIVATE glfw ${TARGET})
+
 target_compile_features(${TARGET} PUBLIC cxx_std_11)

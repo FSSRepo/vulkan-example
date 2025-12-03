@@ -38,7 +38,7 @@ void main() {
     inst.initializeDevice();
 
     VulkanSwapchain chain(inst);
-    chain.initalize(WIDTH, HEIGHT, false);
+    chain.initalize(WIDTH, HEIGHT, true);
 
     auto vertShaderCode = readFile("simple.vert.spv");
     auto fragShaderCode = readFile("simple.frag.spv");
@@ -82,8 +82,10 @@ void main() {
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
-        VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-        VkCommandBuffer cmd = renderer.begin(gpipe, &clearColor, 1);
+        VkClearValue clears[2];
+        clears[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        clears[1].depthStencil = {1.0f, 0};
+        VkCommandBuffer cmd = renderer.begin(gpipe, clears, 2);
 
         VkViewport viewport{};
         viewport.x = 0.0f;
@@ -104,4 +106,10 @@ void main() {
     }
 
     vkDeviceWaitIdle(inst.device);
+    renderer.destroy();
+    gpipe.destroy();
+    chain.destroy();
+    inst.destroy();
+    glfwDestroyWindow(window);
+    glfwTerminate();
 }
