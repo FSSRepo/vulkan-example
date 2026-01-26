@@ -9,10 +9,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include "glm/glm.hpp"
-#include "glm/gtc/matrix_transform.hpp"
-#include "glm/gtc/type_ptr.hpp"
+#include "graphics_math.h"
 
 static uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memProperties;
@@ -517,21 +514,22 @@ int main() {
         vkCmdBindVertexBuffers(cmdOff, 0, 1, vb, voff);
         vkCmdBindIndexBuffer(cmdOff, sceneIBuf.buffer, 0, VK_INDEX_TYPE_UINT32);
         {
-            glm::mat4 proj = glm::perspective(glm::radians(45.0f), (float)chain.swapChainExtent.width / (float)chain.swapChainExtent.height, 0.1f, 100.0f);
-            glm::mat4 view = glm::lookAt(glm::vec3(6.0f, 3.0f, 8.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-            glm::mat4 pv = proj * view;
-            std::memcpy(sceneG.ProjView, glm::value_ptr(pv), sizeof(sceneG.ProjView));
-            sceneG.camera[0] = 6.0f; sceneG.camera[1] = 3.0f; sceneG.camera[2] = 8.0f; sceneG.camera[3] = 0.0f;
-            sceneG.lights[0].position[0] = 4.0f; sceneG.lights[0].position[1] = 4.0f; sceneG.lights[0].position[2] = 4.0f; sceneG.lights[0].position[3] = 0.0f;
-            sceneG.lights[0].color[0] = 1.0f; sceneG.lights[0].color[1] = 0.0f; sceneG.lights[0].color[2] = 0.0f; sceneG.lights[0].color[3] = 0.0f;
-            sceneG.lights[1].position[0] = -4.0f; sceneG.lights[1].position[1] = -4.0f; sceneG.lights[1].position[2] = -4.0f; sceneG.lights[1].position[3] = 0.0f;
-            sceneG.lights[1].color[0] = 0.0f; sceneG.lights[1].color[1] = 1.0f; sceneG.lights[1].color[2] = 0.0f; sceneG.lights[1].color[3] = 0.0f;
-            sceneG.lights[2].position[0] = 0.0f; sceneG.lights[2].position[1] = 0.0f; sceneG.lights[2].position[2] = -4.0f; sceneG.lights[2].position[3] = 0.0f;
-            sceneG.lights[2].color[0] = 0.0f; sceneG.lights[2].color[1] = 0.0f; sceneG.lights[2].color[2] = 1.0f; sceneG.lights[2].color[3] = 0.0f;
+            Mat4 proj = Mat4::perspective(45.0f * (float)M_PI / 180.0f, (float)chain.swapChainExtent.width / (float)chain.swapChainExtent.height, 0.1f, 100.0f);
+            Vec3 eye(6.0f, 3.0f, 8.0f);
+            Vec3 center(0.0f, 0.0f, 0.0f);
+            Vec3 up(0.0f, 1.0f, 0.0f);
+            Mat4 view = Mat4::lookAt(eye, center, up);
+            Mat4 pv = proj * view;
+            std::memcpy(sceneG.ProjView, pv.data(), sizeof(sceneG.ProjView));
+            sceneG.camera[0] = eye.x; sceneG.camera[1] = eye.y; sceneG.camera[2] = eye.z; sceneG.camera[3] = 0.0f;
+            sceneG.lights[0] = {{4,4,4,0}, {1,1,1,0}};
+            sceneG.lights[1] = {{-4,4,4,0}, {1,0,0,0}};
+            sceneG.lights[2] = {{0,4,-4,0}, {0,0,1,0}};
             sceneGUBO.update(&sceneG, sizeof(sceneG));
-            float angle = static_cast<float>(glfwGetTime());
-            glm::mat4 model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 1.0f, 0.0f));
-            std::memcpy(sceneM.model, glm::value_ptr(model), sizeof(sceneM.model));
+
+            float angle = (float)glfwGetTime();
+            Mat4 model = Mat4::rotate(Mat4::identity(), angle, Vec3(0.0f, 1.0f, 0.0f));
+            std::memcpy(sceneM.model, model.data(), sizeof(sceneM.model));
             sceneMUBO.update(&sceneM, sizeof(sceneM));
         }
         VkDescriptorSet offSet = scenePipe.descriptorSets[0];

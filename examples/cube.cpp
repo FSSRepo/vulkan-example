@@ -9,10 +9,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include "glm/glm.hpp"
-#include "glm/gtc/matrix_transform.hpp"
-#include "glm/gtc/type_ptr.hpp"
+#include "graphics_math.h"
 
 #define WIDTH 1280
 #define HEIGHT 720
@@ -48,9 +45,9 @@ struct ModelUniform { float model[16]; };
 
 class Camera {
 public:
-    glm::vec3 position;
-    glm::vec3 up;
-    glm::vec3 direction;
+    Vec3 position;
+    Vec3 up;
+    Vec3 direction;
     float fov;
     float aspect;
     float nearClip;
@@ -58,24 +55,24 @@ public:
     float yaw;
     float pitch;
     Camera() {
-        position = glm::vec3(20.0f, -10.0f, 20.0f);
-        up = glm::vec3(0.0f, 1.0f, 0.0f);
+        position = Vec3(20.0f, -10.0f, 20.0f);
+        up = Vec3(0.0f, 1.0f, 0.0f);
         direction = -position;
-        fov = 45.f * glm::pi<float>() / 180.0f;
+        fov = 45.f * (float)M_PI / 180.0f;
         aspect = (float)WIDTH/(float)HEIGHT;
         nearClip = 0.1f;
         farClip = 100.0f;
         yaw = std::atan2(position.z, position.x);
-        pitch = std::asin(position.y / glm::length(position));
+        pitch = std::asin(position.y / position.length());
     }
     void orbit(float nx, float ny) {
         float sens = 1.0f;
         yaw += nx * sens;
         pitch += ny * sens;
-        float limit = glm::radians(89.0f);
+        float limit = 89.0f * (float)M_PI / 180.0f;
         if (pitch > limit) pitch = limit;
         if (pitch < -limit) pitch = -limit;
-        float radius = glm::length(position);
+        float radius = position.length();
         float cx = std::cos(pitch);
         position.x = radius * cx * std::cos(yaw);
         position.y = radius * std::sin(pitch);
@@ -83,14 +80,14 @@ public:
         direction = -position;
     }
     void move(float nx, float ny) {
-        glm::vec3 dirN = glm::normalize(direction);
-        glm::vec3 right = glm::normalize(glm::cross(dirN, up));
-        position += right * nx + (-dirN) * ny;
+        Vec3 dirN = direction.normalize();
+        Vec3 right = dirN.cross(up).normalize();
+        position = position + right * nx + (-dirN) * ny;
         direction = -position;
     }
-    glm::mat4 getProjViewMatrix() const {
-        glm::mat4 proj = glm::perspective(fov, aspect, nearClip, farClip);
-        glm::mat4 view = glm::lookAt(position, position + direction, up);
+    Mat4 getProjViewMatrix() const {
+        Mat4 proj = Mat4::perspective(fov, aspect, nearClip, farClip);
+        Mat4 view = Mat4::lookAt(position, position + direction, up);
         return proj * view;
     }
 };
@@ -107,7 +104,7 @@ public:
             globalBuffer[i].create(&gdata, sizeof(gdata), true);
         }
     }
-    void addLight(const glm::vec4 &pos, const glm::vec4 &col) {
+    void addLight(const Vec4 &pos, const Vec4 &col) {
         if (lightCount >= 3) return;
         gdata.lights[lightCount].position[0] = pos.x;
         gdata.lights[lightCount].position[1] = pos.y;
@@ -123,8 +120,8 @@ public:
         }
     }
     void updateGlobal(uint32_t currentFrame) {
-        glm::mat4 pv = camera.getProjViewMatrix();
-        std::memcpy(gdata.ProjView, glm::value_ptr(pv), sizeof(gdata.ProjView));
+        Mat4 pv = camera.getProjViewMatrix();
+        std::memcpy(gdata.ProjView, pv.data(), sizeof(gdata.ProjView));
         gdata.camera[0] = camera.position.x;
         gdata.camera[1] = camera.position.y;
         gdata.camera[2] = camera.position.z;
@@ -166,7 +163,7 @@ static VkDescriptorSetLayout gDescriptorSetLayout{};
 
 
 struct Material {
-    glm::vec4 color;
+    Vec4 color;
     VulkanTexture texture;
     std::vector<VkDescriptorSet> descriptorSets;
     bool descriptorsReady = false;
@@ -191,12 +188,12 @@ public:
     VulkanBuffer indexBuffer;
     VulkanBuffer modelUbo[MAX_FRAMES_IN_FLIGHT];
     ModelUniform mdata{};
-    glm::mat4 modelMatrix = glm::mat4(1.0f);
+    Mat4 modelMatrix = Mat4::identity();
     Material material;
     int vertexCount = 0;
     int indexCount = 0;
-    glm::vec3 _pos{0.0f, 0.0f, 0.0f};
-    glm::vec3 _rot{0.0f, 0.0f, 0.0f};
+    Vec3 _pos{0.0f, 0.0f, 0.0f};
+    Vec3 _rot{0.0f, 0.0f, 0.0f};
     void init(VulkanInstance &inst, const std::vector<float> &vertex_data, const std::vector<uint32_t> &index_data) {
         buffer = VulkanBuffer(inst);
         buffer.create(vertex_data.data(), static_cast<int>(vertex_data.size() * sizeof(float)), false);
@@ -210,10 +207,10 @@ public:
             modelUbo[i].create(&mdata, sizeof(mdata), true);
         }
     }
-    void setPosition(const glm::vec3 &p) { _pos = p; updateMatrix(); }
-    void setRotation(const glm::vec3 &r) { _rot = r; updateMatrix(); }
+    void setPosition(const Vec3 &p) { _pos = p; updateMatrix(); }
+    void setRotation(const Vec3 &r) { _rot = r; updateMatrix(); }
     void render(VkCommandBuffer cmd, VkDevice device, ShaderModel &smodel, VulkanGraphicsPipeline &gpipe, uint32_t currentFrame) {
-        std::memcpy(mdata.model, glm::value_ptr(modelMatrix), sizeof(mdata.model));
+        std::memcpy(mdata.model, modelMatrix.data(), sizeof(mdata.model));
         modelUbo[currentFrame].update(&mdata, sizeof(mdata));
         if (!material.descriptorsReady) {
             material.descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
@@ -275,15 +272,13 @@ public:
     void destroy() { buffer.destroy(); indexBuffer.destroy(); material.destroy(); for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) { modelUbo[i].destroy(); } }
 private:
     void updateMatrix() {
-        glm::mat4 T = glm::translate(glm::mat4(1.0f), _pos);
-        glm::mat4 Rx = glm::rotate(glm::mat4(1.0f), _rot.x, glm::vec3(1,0,0));
-        glm::mat4 Ry = glm::rotate(glm::mat4(1.0f), _rot.y, glm::vec3(0,1,0));
-        glm::mat4 Rz = glm::rotate(glm::mat4(1.0f), _rot.z, glm::vec3(0,0,1));
+        Mat4 T = Mat4::translate(Mat4::identity(), _pos);
+        Mat4 Rx = Mat4::rotate(Mat4::identity(), _rot.x, Vec3(1,0,0));
+        Mat4 Ry = Mat4::rotate(Mat4::identity(), _rot.y, Vec3(0,1,0));
+        Mat4 Rz = Mat4::rotate(Mat4::identity(), _rot.z, Vec3(0,0,1));
         modelMatrix = T * (Rz * Ry * Rx);
     }
 };
-
- 
 
 void main() {
     glfwInit();
@@ -383,9 +378,9 @@ void main() {
     }
     ShaderModel smodel;
     smodel.init(inst);
-    smodel.addLight(glm::vec4(4.0f, 4.0f, 4.0f, 0.0f), glm::vec4(1.0f, 0.0f, 0.0f, 0.0f));
-    smodel.addLight(glm::vec4(-4.0f, -4.0f, -4.0f, 0.0f), glm::vec4(0.0f, 1.0f, 0.0f, 0.0f));
-    smodel.addLight(glm::vec4(0.0f, 0.0f, -4.0f, 0.0f), glm::vec4(0.0f, 0.0f, 1.0f, 0.0f));
+    smodel.addLight(Vec4(4.0f, 4.0f, 4.0f, 0.0f), Vec4(1.0f, 0.0f, 0.0f, 0.0f));
+    smodel.addLight(Vec4(-4.0f, -4.0f, -4.0f, 0.0f), Vec4(0.0f, 1.0f, 0.0f, 0.0f));
+    smodel.addLight(Vec4(0.0f, 0.0f, -4.0f, 0.0f), Vec4(0.0f, 0.0f, 1.0f, 0.0f));
     VkDescriptorPoolSize poolSizes[2]{};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     uint32_t kMaxSets = MAX_FRAMES_IN_FLIGHT * 16;
@@ -416,24 +411,24 @@ void main() {
     light0.init(inst, lightMesh.vertices, lightMesh.indices);
     light1.init(inst, lightMesh.vertices, lightMesh.indices);
     light2.init(inst, lightMesh.vertices, lightMesh.indices);
-    light0.material.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
-    light1.material.color = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
-    light2.material.color = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+    light0.material.color = Vec4(1.0f, 0.0f, 0.0f, 1.0f);
+    light1.material.color = Vec4(0.0f, 1.0f, 0.0f, 1.0f);
+    light2.material.color = Vec4(0.0f, 0.0f, 1.0f, 1.0f);
     light0.material.createTextureFromColor(inst);
     light1.material.createTextureFromColor(inst);
     light2.material.createTextureFromColor(inst);
-    light0.setPosition(glm::vec3(4.0f, 4.0f, 4.0f));
-    light1.setPosition(glm::vec3(-4.0f, -4.0f, -4.0f));
-    light2.setPosition(glm::vec3(0.0f, 0.0f, -4.0f));
+    light0.setPosition(Vec3(4.0f, 4.0f, 4.0f));
+    light1.setPosition(Vec3(-4.0f, -4.0f, -4.0f));
+    light2.setPosition(Vec3(0.0f, 0.0f, -4.0f));
 
     ModelObject model;
     auto cubeMesh = createBoxMesh(2.0f, 2.0f, 2.0f);
     model.init(inst, cubeMesh.vertices, cubeMesh.indices);
     if (textureOK) {
-        model.material.color = glm::vec4(1.0f);
+        model.material.color = Vec4(1.0f, 1.0f, 1.0f, 1.0f);
         model.material.texture = tmpTex;
     } else {
-        model.material.color = glm::vec4(1.0f);
+        model.material.color = Vec4(1.0f, 1.0f, 1.0f, 1.0f);
         model.material.createTextureFromColor(inst);
     }
 
@@ -472,7 +467,7 @@ void main() {
         int lmb = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
         int rmb = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT);
         if (lmb == GLFW_PRESS) {
-            smodel.camera.orbit((float)dx * 0.005f, (float)dy * 0.005f);
+            smodel.camera.orbit((float)dx * 0.005f, (float)-dy * 0.005f);
         }
         if (rmb == GLFW_PRESS) {
             smodel.camera.move((float)dx * 0.01f, (float)-dy * 0.01f);

@@ -22,7 +22,7 @@
 /* Initialize the Vulkan function pointer variables declared in this header.
  * Returns 0 if vulkan is not available, non-zero if it is available.
  */
-int InitVulkan(void);
+int loadVulkanLibrary(void);
 
 // VK_core
 extern PFN_vkCreateInstance vkCreateInstance;

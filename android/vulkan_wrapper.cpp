@@ -15,7 +15,7 @@
 #include "vulkan_wrapper.h"
 #include <dlfcn.h>
 
-int InitVulkan(void) {
+int loadVulkanLibrary(void) {
     void* libvulkan = dlopen("libvulkan.so", RTLD_NOW | RTLD_LOCAL);
     if (!libvulkan)
         return 0;
