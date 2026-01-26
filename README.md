@@ -11,25 +11,26 @@ Ejemplos mínimos de Vulkan en C++ para Windows usando GLFW y un pequeño wrappe
 
 ## Construcción
 1) Generar el proyecto (Visual Studio 2022 x64):
-```
+```powershell
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 ```
 
-2) Compilar shaders a SPIR-V (usa `glslc.exe` del Vulkan SDK):
+2) Compilar shaders y binarios:
+Puedes usar el script `run.bat` que automatiza la compilación de shaders a SPIR-V y la construcción del proyecto:
+```powershell
+run.bat
 ```
-cpu.bat
-```
-Esto compila `shaders/*.vert` y `shaders/*.frag` a `build\Release\*.spv`.
+Esto compila `shaders/*.vert` y `shaders/*.frag` a `build\Release\*.spv` y luego compila los binarios en `build\Release`.
 
-3) Compilar binarios:
+### Alternativa manual:
+Compilar shaders:
+```powershell
+glslc shaders/simple.vert -o build/Release/simple.vert.spv
+# ... (repetir para otros shaders)
 ```
+Compilar binarios:
+```powershell
 cmake --build build --config Release
-```
-
-Alternativa (generadores single-config):
-```
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
 ```
 
 ## Ejecución
@@ -44,22 +45,18 @@ Los ejecutables se generan en `build\Release`:
 - `vulkan-proc`: render offscreen y postproceso (usa `contrast.vert/frag`).
 
 ## Estructura
-- `vkApp.h` / `vkApp.cpp`: wrapper con clases principales:
-  - `VulkanInstance` (`vkApp.h:20`)
-  - `VulkanSwapchain` (`vkApp.h:48`)
-  - `VulkanGraphicsPipeline` (`vkApp.h:80`)
-  - `VulkanRenderer` (`vkApp.h:111`)
-  - `VulkanBuffer` (`vkApp.h:138`)
-  - `VulkanTexture` (`vkApp.h:162`)
-- Ejemplos: `simple.cpp`, `vertex.cpp`, `texture.cpp`, `depth.cpp`, `cube.cpp`, `postprocess.cpp`.
-- Shaders: `shaders/*.vert`, `shaders/*.frag` → `.spv` vía `glslc`.
-- Dependencias incluidas: `glm/` (header-only), `stb_image.h`.
+- `vkApp.h` / `vkApp.cpp`: wrapper con clases principales.
+- `vkUtils.h`: funciones de utilidad para selección de dispositivos, extensiones y familias de colas.
+- `examples/`: código fuente de los ejemplos (`simple.cpp`, `vertex.cpp`, `texture.cpp`, `depth.cpp`, `cube.cpp`, `postprocess.cpp`).
+- `shaders/`: archivos GLSL (`*.vert`, `*.frag`) que se compilan a `.spv`.
+- `android/`: soporte experimental para Android (incluye `cube_android.cpp` y un wrapper específico).
+- Dependencias: `stb_image.h`, `graphics_math.h` (utilidad matemática propia).
 
 ## Notas
 - Los ejemplos usan `debug_app = true` para activar capas de validación si el Vulkan SDK está presente.
 - Si CMake no encuentra `glfw3`, puedes instalarlo con vcpkg y pasar el toolchain:
-```
+```powershell
 vcpkg install glfw3:x64-windows
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE=C:\path\to\vcpkg\scripts\buildsystems\vcpkg.cmake
 ```
-- Asegúrate de que `glslc.exe` esté en `PATH` o ajusta `GLSLC` en `cpu.bat`.
+- Asegúrate de que `glslc.exe` esté en `PATH` para que `run.bat` funcione correctamente.
