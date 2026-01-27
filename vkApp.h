@@ -87,10 +87,10 @@ class VulkanGraphicsPipeline {
     uint32_t uniformBindingCount = 0;
     bool depthOverride = false;
     bool ownsDescriptorSetLayout = false;
-    VkDescriptorSetLayout descriptorSetLayout{};
     VkDescriptorPool descriptorPool{};
 
     public:
+    VkDescriptorSetLayout descriptorSetLayout{};
     std::vector<VkDescriptorSet> descriptorSets;
     VkPipeline graphicsPipeline;
     VulkanGraphicsPipeline(VulkanSwapchain swap, const std::vector<char>& vertex, const std::vector<char>& fragment);

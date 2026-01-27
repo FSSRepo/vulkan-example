@@ -81,8 +81,7 @@ public:
     }
     void move(float nx, float ny) {
         Vec3 dirN = direction.normalize();
-        Vec3 right = dirN.cross(up).normalize();
-        position = position + right * nx + (-dirN) * ny;
+        position = position + (-dirN) * ny;
         direction = -position;
     }
     Mat4 getProjViewMatrix() const {
@@ -470,7 +469,7 @@ void main() {
             smodel.camera.orbit((float)dx * 0.005f, (float)-dy * 0.005f);
         }
         if (rmb == GLFW_PRESS) {
-            smodel.camera.move((float)dx * 0.01f, (float)-dy * 0.01f);
+            smodel.camera.move((float)dx * 0.1f, (float)-dy * 0.07f);
         }
 
         float angle = static_cast<float>(glfwGetTime());
