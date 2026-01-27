@@ -1,62 +1,45 @@
 # Vulkan Example
 
-Ejemplos mínimos de Vulkan en C++ para Windows usando GLFW y un pequeño wrapper de conveniencia. Incluye muestras de triángulo, atributos de vértice, texturas, profundidad (depth), escena 3D con luces y un paso de postproceso.
+Minimal Vulkan examples in C++ for Windows using GLFW and a small convenience wrapper. Includes samples for triangle, vertex attributes, textures, depth, 3D scene with lights, and a post-processing pass.
 
-## Requisitos
+## Requirements
 - Windows 10/11
 - `cmake` ≥ 3.31
-- Compilador C++ con soporte de C++11 (p. ej. Visual Studio 2022/MSVC)
-- Vulkan SDK instalado (incluye `glslc.exe` y capas de validación)
-- GLFW 3 instalado y detectable por CMake (`find_package(glfw3 REQUIRED)`)
+- C++ compiler with C++11 support
+- Vulkan SDK installed (includes `glslc.exe` and validation layers)
+- GLFW 3 installed and detectable by CMake (`find_package(glfw3 REQUIRED)`)
 
-## Construcción
-1) Generar el proyecto (Visual Studio 2022 x64):
+## Building
+1) Generate the project:
 ```powershell
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake -S . -B build
 ```
 
-2) Compilar shaders y binarios:
-Puedes usar el script `run.bat` que automatiza la compilación de shaders a SPIR-V y la construcción del proyecto:
-```powershell
-run.bat
-```
-Esto compila `shaders/*.vert` y `shaders/*.frag` a `build\Release\*.spv` y luego compila los binarios en `build\Release`.
-
-### Alternativa manual:
-Compilar shaders:
+### Manual Alternative:
+Compile shaders:
 ```powershell
 glslc shaders/simple.vert -o build/Release/simple.vert.spv
-# ... (repetir para otros shaders)
+# ... (repeat for other shaders)
 ```
-Compilar binarios:
+Build binaries:
 ```powershell
 cmake --build build --config Release
 ```
 
-## Ejecución
-Los ejecutables se generan en `build\Release`:
-- `vulkan-simple`: triángulo básico.
-- `vulkan-vertex`: vértices con posición y UV.
-- `vulkan-texture`: muestreo de textura; coloca `texture.jpg` junto al ejecutable.
-- `vulkan-depth`: render con z-buffer.
-- `vulkan-3d`: cubo texturizado con tres luces. Controles:
-  - Botón izquierdo: orbitar cámara
-  - Botón derecho: mover cámara
-- `vulkan-proc`: render offscreen y postproceso (usa `contrast.vert/frag`).
+## Running
+Executables are generated in `build\Release`:
+- `vulkan-simple`: basic triangle.
+- `vulkan-vertex`: vertices with position and UV.
+- `vulkan-texture`: texture sampling; place `texture.jpg` next to the executable.
+- `vulkan-depth`: render with z-buffer.
+- `vulkan-3d`: textured cube with three lights. Controls:
+  - Left mouse button: orbit camera
+- `vulkan-proc`: offscreen rendering and post-processing (uses `contrast.vert/frag`).
 
-## Estructura
-- `vkApp.h` / `vkApp.cpp`: wrapper con clases principales.
-- `vkUtils.h`: funciones de utilidad para selección de dispositivos, extensiones y familias de colas.
-- `examples/`: código fuente de los ejemplos (`simple.cpp`, `vertex.cpp`, `texture.cpp`, `depth.cpp`, `cube.cpp`, `postprocess.cpp`).
-- `shaders/`: archivos GLSL (`*.vert`, `*.frag`) que se compilan a `.spv`.
-- `android/`: soporte experimental para Android (incluye `cube_android.cpp` y un wrapper específico).
-- Dependencias: `stb_image.h`, `graphics_math.h` (utilidad matemática propia).
-
-## Notas
-- Los ejemplos usan `debug_app = true` para activar capas de validación si el Vulkan SDK está presente.
-- Si CMake no encuentra `glfw3`, puedes instalarlo con vcpkg y pasar el toolchain:
-```powershell
-vcpkg install glfw3:x64-windows
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE=C:\path\to\vcpkg\scripts\buildsystems\vcpkg.cmake
-```
-- Asegúrate de que `glslc.exe` esté en `PATH` para que `run.bat` funcione correctamente.
+## Structure
+- `vkApp.h` / `vkApp.cpp`: wrapper with main classes.
+- `vkUtils.h`: utility functions for device selection, extensions, and queue families.
+- `examples/`: source code for examples (`simple.cpp`, `vertex.cpp`, `texture.cpp`, `depth.cpp`, `cube.cpp`, `postprocess.cpp`).
+- `shaders/`: GLSL files (`*.vert`, `*.frag`) that compile to `.spv`.
+- `android/`: experimental Android support (includes `cube_android.cpp` and a specific wrapper).
+- Dependencies: `stb_image.h`, `graphics_math.h` (custom math utility).
