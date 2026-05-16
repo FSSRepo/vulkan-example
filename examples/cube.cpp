@@ -424,7 +424,7 @@ int main() {
     model.init(inst, cubeMesh.vertices, cubeMesh.indices);
     if (textureOK) {
         model.material.color = Vec4(1.0f, 1.0f, 1.0f, 1.0f);
-        model.material.texture = tmpTex;
+        model.material.texture = std::move(tmpTex);
     } else {
         model.material.color = Vec4(1.0f, 1.0f, 1.0f, 1.0f);
         model.material.createTextureFromColor(inst);

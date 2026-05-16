@@ -281,3 +281,49 @@ void VulkanTexture::destroy()
         commandPool = VK_NULL_HANDLE;
     }
 }
+
+VulkanTexture::VulkanTexture(VulkanTexture&& other) noexcept
+    : device(other.device), physicalDevice(other.physicalDevice), graphicsQueue(other.graphicsQueue),
+      commandPool(other.commandPool), image(other.image), imageMemory(other.imageMemory),
+      imgWidth(other.imgWidth), imgHeight(other.imgHeight), imageView(other.imageView), sampler(other.sampler)
+{
+    other.device = VK_NULL_HANDLE;
+    other.physicalDevice = VK_NULL_HANDLE;
+    other.graphicsQueue = VK_NULL_HANDLE;
+    other.commandPool = VK_NULL_HANDLE;
+    other.image = VK_NULL_HANDLE;
+    other.imageMemory = VK_NULL_HANDLE;
+    other.imgWidth = 0;
+    other.imgHeight = 0;
+    other.imageView = VK_NULL_HANDLE;
+    other.sampler = VK_NULL_HANDLE;
+}
+
+VulkanTexture& VulkanTexture::operator=(VulkanTexture&& other) noexcept
+{
+    if (this != &other)
+    {
+        destroy();
+        device = other.device;
+        physicalDevice = other.physicalDevice;
+        graphicsQueue = other.graphicsQueue;
+        commandPool = other.commandPool;
+        image = other.image;
+        imageMemory = other.imageMemory;
+        imgWidth = other.imgWidth;
+        imgHeight = other.imgHeight;
+        imageView = other.imageView;
+        sampler = other.sampler;
+        other.device = VK_NULL_HANDLE;
+        other.physicalDevice = VK_NULL_HANDLE;
+        other.graphicsQueue = VK_NULL_HANDLE;
+        other.commandPool = VK_NULL_HANDLE;
+        other.image = VK_NULL_HANDLE;
+        other.imageMemory = VK_NULL_HANDLE;
+        other.imgWidth = 0;
+        other.imgHeight = 0;
+        other.imageView = VK_NULL_HANDLE;
+        other.sampler = VK_NULL_HANDLE;
+    }
+    return *this;
+}

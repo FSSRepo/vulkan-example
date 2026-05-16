@@ -20,6 +20,10 @@ class VulkanBuffer {
     VkDeviceSize size{};
     VulkanBuffer() {}
     VulkanBuffer(VulkanInstance instance);
+    VulkanBuffer(const VulkanBuffer&) = delete;
+    VulkanBuffer& operator=(const VulkanBuffer&) = delete;
+    VulkanBuffer(VulkanBuffer&& other) noexcept;
+    VulkanBuffer& operator=(VulkanBuffer&& other) noexcept;
     VkCommandBuffer beginSingleTimeCommands();
     void endSingleTimeCommands(VkCommandBuffer commandBuffer);
     void create(const void* data, int data_size, bool uniform_buffer);

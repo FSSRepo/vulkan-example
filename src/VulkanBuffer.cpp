@@ -346,6 +346,53 @@ void VulkanBuffer::destroy()
     }
 }
 
+VulkanBuffer::VulkanBuffer(VulkanBuffer&& other) noexcept
+    : device(other.device), physicalDevice(other.physicalDevice), graphicsQueue(other.graphicsQueue),
+      commandPool(other.commandPool), hostVisible(other.hostVisible), allocSize(other.allocSize),
+      buffer(other.buffer), bufferMemory(other.bufferMemory), size(other.size)
+{
+    other.device = VK_NULL_HANDLE;
+    other.physicalDevice = VK_NULL_HANDLE;
+    other.graphicsQueue = VK_NULL_HANDLE;
+    other.commandPool = VK_NULL_HANDLE;
+    other.hostVisible = false;
+    other.allocSize = 0;
+    other.buffer = VK_NULL_HANDLE;
+    other.bufferMemory = VK_NULL_HANDLE;
+    other.size = 0;
+}
+
+VulkanBuffer& VulkanBuffer::operator=(VulkanBuffer&& other) noexcept
+{
+    if (this != &other)
+    {
+        destroy();
+        if (commandPool)
+        {
+            vkDestroyCommandPool(device, commandPool, nullptr);
+        }
+        device = other.device;
+        physicalDevice = other.physicalDevice;
+        graphicsQueue = other.graphicsQueue;
+        commandPool = other.commandPool;
+        hostVisible = other.hostVisible;
+        allocSize = other.allocSize;
+        buffer = other.buffer;
+        bufferMemory = other.bufferMemory;
+        size = other.size;
+        other.device = VK_NULL_HANDLE;
+        other.physicalDevice = VK_NULL_HANDLE;
+        other.graphicsQueue = VK_NULL_HANDLE;
+        other.commandPool = VK_NULL_HANDLE;
+        other.hostVisible = false;
+        other.allocSize = 0;
+        other.buffer = VK_NULL_HANDLE;
+        other.bufferMemory = VK_NULL_HANDLE;
+        other.size = 0;
+    }
+    return *this;
+}
+
 VulkanBuffer::~VulkanBuffer()
 {
     destroy();

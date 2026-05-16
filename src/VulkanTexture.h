@@ -31,6 +31,10 @@ class VulkanTexture {
     public:
     VulkanTexture() {}
     VulkanTexture(VulkanInstance instance);
+    VulkanTexture(const VulkanTexture&) = delete;
+    VulkanTexture& operator=(const VulkanTexture&) = delete;
+    VulkanTexture(VulkanTexture&& other) noexcept;
+    VulkanTexture& operator=(VulkanTexture&& other) noexcept;
     void load(const void* data, int width, int height);
     void destroy();
     VkImageView getImageView() { return imageView; }
