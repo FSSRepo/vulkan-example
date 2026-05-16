@@ -1,6 +1,4 @@
 #include "vkApp.h"
-#define __VK_Utils__
-#include "vkUtils.h"
 #include <iostream>
 #include <fstream>
 #include <cstring>

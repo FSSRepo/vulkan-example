@@ -160,7 +160,6 @@ static MeshData createBoxMesh(float w, float h, float d) {
 static VkDescriptorPool gDescriptorPool{};
 static VkDescriptorSetLayout gDescriptorSetLayout{};
 
-
 struct Material {
     Vec4 color;
     VulkanTexture texture;
@@ -279,7 +278,7 @@ private:
     }
 };
 
-void main() {
+int main() {
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
@@ -494,5 +493,5 @@ void main() {
     inst.destroy();
     glfwDestroyWindow(window);
     glfwTerminate();
-
+    return 0;
 }

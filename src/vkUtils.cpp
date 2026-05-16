@@ -1,9 +1,4 @@
-#ifndef __VK_Utils__
-#define __VK_Utils__
-template <typename T>
-constexpr const T& clamp(const T& v, const T& lo, const T& hi) {
-    return (v < lo) ? lo : (hi < v) ? hi : v;
-}
+#include "vkUtils.h"
 
 std::vector<const char*> getRequiredExtensions() {
 #ifdef ANDROID_VULKAN
@@ -19,21 +14,6 @@ std::vector<const char*> getRequiredExtensions() {
     return extensions;
 #endif
 }
-
-struct SwapChainSupportDetails {
-    VkSurfaceCapabilitiesKHR capabilities;
-    std::vector<VkSurfaceFormatKHR> formats;
-    std::vector<VkPresentModeKHR> presentModes;
-};
-
-struct QueueFamilyIndices {
-   std::pair<uint32_t, bool> graphicsFamily {0, false};
-    std::pair<uint32_t, bool> presentFamily  {0, false};
-
-    bool isComplete() const {
-        return graphicsFamily.second && presentFamily.second;
-    }
-};
 
 QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) {
     QueueFamilyIndices indices;
@@ -162,4 +142,3 @@ VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& avai
 
     return VK_PRESENT_MODE_FIFO_KHR;
 }
-#endif

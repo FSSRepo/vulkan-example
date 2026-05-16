@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Vulkan Example</string>
+    <string name="none">None</string>
+</resources>

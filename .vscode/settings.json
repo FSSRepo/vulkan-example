@@ -68,7 +68,7 @@
         "xhash": "cpp"
     },
     "C_Cpp.default.includePath": [
-        "C:\\VulkanSDK\\1.4.321.1\\Include",
-        "C:\\Program Files (x86)\\GLFW\\include"
+        "C:\\Program Files (x86)\\GLFW\\include",
+        "D:\\SDKs\\VulkanSDK\\Include"
     ]
 }

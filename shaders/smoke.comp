@@ -1,0 +1,90 @@
+#version 450
+
+layout(local_size_x = 256) in;
+
+struct Particle {
+    vec4 pos;   // xyz = position, w = life
+    vec4 vel;   // xyz = velocity, w = max life
+    vec4 color; // rgb = color, w = unused
+};
+
+layout(std430, binding = 0) readonly buffer ParticlesIn {
+    Particle particles[];
+} particlesIn;
+
+layout(std430, binding = 1) buffer ParticlesOut {
+    Particle particles[];
+} particlesOut;
+
+layout(binding = 2) uniform SimParams {
+    float dt;
+    float time;
+} params;
+
+uint wang_hash(uint seed) {
+    seed = (seed ^ 61u) ^ (seed >> 16u);
+    seed *= 9u;
+    seed = seed ^ (seed >> 4u);
+    seed *= 0x27d4eb2du;
+    seed = seed ^ (seed >> 15u);
+    return seed;
+}
+
+float randf(uint seed) {
+    return float(wang_hash(seed)) / 4294967296.0;
+}
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= 65536) return;
+
+    Particle p = particlesIn.particles[idx];
+    float life = p.pos.w;
+    float maxLife = p.vel.w;
+
+    if (life <= 0.0) {
+        // respawn smoke source
+        uint seed = uint(idx) + uint(params.time * 1000.0) * 73856093u;
+        float rx = (randf(seed) - 0.5) * 0.8;
+        float rz = (randf(seed + 1u) - 0.5) * 0.8;
+        p.pos.xyz = vec3(rx, -1.0, rz);
+        p.pos.w = 3.0 + randf(seed + 2u) * 3.0;
+
+        float vx = (randf(seed + 3u) - 0.5) * 0.5;
+        float vz = (randf(seed + 4u) - 0.5) * 0.5;
+        float vy = 0.5 + randf(seed + 5u) * 1.0;
+        p.vel.xyz = vec3(vx, vy, vz);
+        p.vel.w = p.pos.w;
+
+        p.color.rgb = vec3(0.3, 0.3, 0.3);
+    } else {
+        // turbulence
+        float t = params.time;
+        vec3 pos = p.pos.xyz;
+        float turbX = sin(pos.y * 2.0 + t * 3.0 + float(idx) * 0.01) * 0.3;
+        float turbZ = cos(pos.y * 2.0 + t * 2.5 + float(idx) * 0.013) * 0.3;
+
+        p.vel.x += turbX * params.dt;
+        p.vel.z += turbZ * params.dt;
+        p.vel.x *= 0.98;
+        p.vel.z *= 0.98;
+
+        p.pos.xyz += p.vel.xyz * params.dt;
+        p.pos.w -= params.dt;
+
+        float lifeRatio = clamp(p.pos.w / p.vel.w, 0.0, 1.0);
+        vec3 darkSmoke = vec3(0.15, 0.15, 0.15);
+        vec3 lightSmoke = vec3(0.6, 0.6, 0.6);
+        vec3 white = vec3(0.9, 0.9, 0.9);
+
+        if (lifeRatio > 0.6) {
+            p.color.rgb = mix(lightSmoke, darkSmoke, (lifeRatio - 0.6) / 0.4);
+        } else if (lifeRatio > 0.3) {
+            p.color.rgb = mix(white, lightSmoke, (lifeRatio - 0.3) / 0.3);
+        } else {
+            p.color.rgb = white;
+        }
+    }
+
+    particlesOut.particles[idx] = p;
+}

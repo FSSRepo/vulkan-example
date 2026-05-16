@@ -29,7 +29,7 @@ struct Vertex {
     float uv[2];
 };
 
-void main() {
+int main() {
     glfwInit();
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -147,4 +147,5 @@ void main() {
     inst.destroy();
     glfwDestroyWindow(window);
     glfwTerminate();
+    return 0;
 }
