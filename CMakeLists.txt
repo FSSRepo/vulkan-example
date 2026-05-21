@@ -58,6 +58,7 @@ add_library(${TARGET} STATIC
     src/VulkanGraphicsPipeline.cpp 
     src/VulkanRenderer.cpp 
     src/vkUtils.cpp
+    examples/utils.cpp
 )
 target_link_libraries(${TARGET} PRIVATE glfw ${Vulkan_LIBRARIES})
 

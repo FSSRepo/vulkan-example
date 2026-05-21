@@ -1,20 +1,12 @@
+
 #include "VulkanBuffer.h"
-#include "vkUtils.h"
 
 VulkanBuffer::VulkanBuffer(VulkanInstance instance)
 {
     device = instance.device;
     physicalDevice = instance.physicalDevice;
     graphicsQueue = instance.graphicsQueue;
-    QueueFamilyIndices indices = findQueueFamilies(physicalDevice, instance.surface);
-    VkCommandPoolCreateInfo poolInfo{};
-    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    poolInfo.queueFamilyIndex = indices.graphicsFamily.first;
-    if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create buffer command pool!");
-    }
+    qFamilyIndices = findQueueFamilies(physicalDevice, instance.surface);
 }
 
 uint32_t VulkanBuffer::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
@@ -31,8 +23,90 @@ uint32_t VulkanBuffer::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags
     throw std::runtime_error("failed to find suitable memory type for buffer!");
 }
 
+void VulkanBuffer::createBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& outBuffer, VkDeviceMemory& outMemory, VkDeviceSize* outAllocSize)
+{
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = bufferSize;
+    bufferInfo.usage = usage;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(device, &bufferInfo, nullptr, &outBuffer) != VK_SUCCESS)
+    {
+        throw std::runtime_error("failed to create buffer!");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(device, outBuffer, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &outMemory) != VK_SUCCESS)
+    {
+        throw std::runtime_error("failed to allocate buffer memory!");
+    }
+
+    if (vkBindBufferMemory(device, outBuffer, outMemory, 0) != VK_SUCCESS)
+    {
+        throw std::runtime_error("failed to bind buffer memory!");
+    }
+
+    if (outAllocSize)
+    {
+        *outAllocSize = memRequirements.size;
+    }
+}
+
+void VulkanBuffer::mapCopyUnmap(VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize dataSize, const void* data, VkDeviceSize clearExtra)
+{
+    void* mapped;
+    vkMapMemory(device, memory, offset, dataSize + clearExtra, 0, &mapped);
+    std::memcpy(mapped, data, static_cast<size_t>(dataSize));
+    if (clearExtra > 0)
+    {
+        std::memset(static_cast<char*>(mapped) + static_cast<size_t>(dataSize), 0, static_cast<size_t>(clearExtra));
+    }
+    vkUnmapMemory(device, memory);
+}
+
+void VulkanBuffer::copyBuffer(VkBuffer src, VkBuffer dst, VkDeviceSize copySize)
+{
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+    VkBufferCopy copyRegion{};
+    copyRegion.srcOffset = 0;
+    copyRegion.dstOffset = 0;
+    copyRegion.size = copySize;
+    vkCmdCopyBuffer(commandBuffer, src, dst, 1, &copyRegion);
+    endSingleTimeCommands(commandBuffer);
+}
+
+void VulkanBuffer::createCommandPool()
+{
+    VkCommandPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolInfo.queueFamilyIndex = qFamilyIndices.graphicsFamily.first;
+
+    if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS)
+    {
+        throw std::runtime_error("failed to create buffer command pool!");
+    }
+}
+
+void VulkanBuffer::ensureCommandPool()
+{
+    if (!commandPool)
+    {
+        createCommandPool();
+    }
+}
+
 VkCommandBuffer VulkanBuffer::beginSingleTimeCommands()
 {
+    ensureCommandPool();
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -59,21 +133,13 @@ void VulkanBuffer::endSingleTimeCommands(VkCommandBuffer commandBuffer)
     vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
 }
 
-void VulkanBuffer::copyBuffer(VkBuffer src, VkBuffer dst, VkDeviceSize sz)
-{
-    VkCommandBuffer cmd = beginSingleTimeCommands();
-    VkBufferCopy copyRegion{};
-    copyRegion.srcOffset = 0;
-    copyRegion.dstOffset = 0;
-    copyRegion.size = sz;
-    vkCmdCopyBuffer(cmd, src, dst, 1, &copyRegion);
-    endSingleTimeCommands(cmd);
-}
 
-void VulkanBuffer::create(const void *data, int data_size, bool uniform_buffer)
+
+void VulkanBuffer::create(const void *data, int dataSize, bool uniformBuffer)
 {
-    size = static_cast<VkDeviceSize>(data_size);
-    if (uniform_buffer)
+    size = static_cast<VkDeviceSize>(dataSize);
+
+    if (uniformBuffer)
     {
         hostVisible = true;
         VkPhysicalDeviceProperties props;
@@ -84,249 +150,69 @@ void VulkanBuffer::create(const void *data, int data_size, bool uniform_buffer)
         {
             alignedSize = (size + align - 1) & ~(align - 1);
         }
-        VkBufferCreateInfo bufferInfo{};
-        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferInfo.size = alignedSize;
-        bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
-        {
-            throw std::runtime_error("failed to create uniform buffer!");
-        }
-        VkMemoryRequirements memRequirements;
-        vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
-        uint32_t typeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = typeIndex;
-        if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS)
-        {
-            throw std::runtime_error("failed to allocate uniform buffer memory!");
-        }
-        if (vkBindBufferMemory(device, buffer, bufferMemory, 0) != VK_SUCCESS)
-        {
-            throw std::runtime_error("failed to bind uniform buffer memory!");
-        }
-        allocSize = memRequirements.size;
-        void *mapped;
-        vkMapMemory(device, bufferMemory, 0, allocSize, 0, &mapped);
-        std::memcpy(mapped, data, static_cast<size_t>(size));
-        if (allocSize > size)
-        {
-            std::memset(static_cast<char *>(mapped) + static_cast<size_t>(size), 0, static_cast<size_t>(allocSize - size));
-        }
-        vkUnmapMemory(device, bufferMemory);
+
+        createBuffer(alignedSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     buffer, bufferMemory, &allocSize);
+        mapCopyUnmap(bufferMemory, 0, size, data, allocSize - size);
         return;
     }
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
-    VkBufferCreateInfo stagingInfo{};
-    stagingInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    stagingInfo.size = size;
-    stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    stagingInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    if (vkCreateBuffer(device, &stagingInfo, nullptr, &stagingBuffer) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create staging buffer!");
-    }
-    VkMemoryRequirements stagingReq;
-    vkGetBufferMemoryRequirements(device, stagingBuffer, &stagingReq);
-    uint32_t hostTypeIndex = findMemoryType(stagingReq.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    VkMemoryAllocateInfo stagingAlloc{};
-    stagingAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    stagingAlloc.allocationSize = stagingReq.size;
-    stagingAlloc.memoryTypeIndex = hostTypeIndex;
-    if (vkAllocateMemory(device, &stagingAlloc, nullptr, &stagingBufferMemory) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to allocate staging buffer memory!");
-    }
-    vkBindBufferMemory(device, stagingBuffer, stagingBufferMemory, 0);
-    void *mapped;
-    vkMapMemory(device, stagingBufferMemory, 0, size, 0, &mapped);
-    std::memcpy(mapped, data, static_cast<size_t>(size));
-    vkUnmapMemory(device, stagingBufferMemory);
+    createBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer, stagingBufferMemory);
+    mapCopyUnmap(stagingBufferMemory, 0, size, data, 0);
 
-    VkBufferCreateInfo bufferInfo{};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = size;
-    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create vertex buffer!");
-    }
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
-    uint32_t deviceTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    VkMemoryAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = deviceTypeIndex;
-    if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to allocate vertex buffer memory!");
-    }
-    if (vkBindBufferMemory(device, buffer, bufferMemory, 0) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to bind vertex buffer memory!");
-    }
+    createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                 buffer, bufferMemory);
 
-    VkCommandBufferAllocateInfo allocInfoCmd{};
-    allocInfoCmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfoCmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfoCmd.commandPool = commandPool;
-    allocInfoCmd.commandBufferCount = 1;
-    VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(device, &allocInfoCmd, &commandBuffer);
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
-    VkBufferCopy copyRegion{};
-    copyRegion.srcOffset = 0;
-    copyRegion.dstOffset = 0;
-    copyRegion.size = size;
-    vkCmdCopyBuffer(commandBuffer, stagingBuffer, buffer, 1, &copyRegion);
-    vkEndCommandBuffer(commandBuffer);
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-    vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(graphicsQueue);
-    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+    copyBuffer(stagingBuffer, buffer, size);
+
     vkDestroyBuffer(device, stagingBuffer, nullptr);
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
-void VulkanBuffer::createIndex(const void *data, int data_size)
+void VulkanBuffer::createIndex(const void *data, int dataSize)
 {
-    size = static_cast<VkDeviceSize>(data_size);
+    size = static_cast<VkDeviceSize>(dataSize);
+
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
-    VkBufferCreateInfo stagingInfo{};
-    stagingInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    stagingInfo.size = size;
-    stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    stagingInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    if (vkCreateBuffer(device, &stagingInfo, nullptr, &stagingBuffer) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create staging buffer!");
-    }
-    VkMemoryRequirements stagingReq;
-    vkGetBufferMemoryRequirements(device, stagingBuffer, &stagingReq);
-    uint32_t hostTypeIndex = findMemoryType(stagingReq.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    VkMemoryAllocateInfo stagingAlloc{};
-    stagingAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    stagingAlloc.allocationSize = stagingReq.size;
-    stagingAlloc.memoryTypeIndex = hostTypeIndex;
-    if (vkAllocateMemory(device, &stagingAlloc, nullptr, &stagingBufferMemory) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to allocate staging buffer memory!");
-    }
-    vkBindBufferMemory(device, stagingBuffer, stagingBufferMemory, 0);
-    void *mapped;
-    vkMapMemory(device, stagingBufferMemory, 0, size, 0, &mapped);
-    std::memcpy(mapped, data, static_cast<size_t>(size));
-    vkUnmapMemory(device, stagingBufferMemory);
+    createBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer, stagingBufferMemory);
+    mapCopyUnmap(stagingBufferMemory, 0, size, data, 0);
 
-    VkBufferCreateInfo bufferInfo{};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = size;
-    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create index buffer!");
-    }
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
-    uint32_t deviceTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    VkMemoryAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = deviceTypeIndex;
-    if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to allocate index buffer memory!");
-    }
-    if (vkBindBufferMemory(device, buffer, bufferMemory, 0) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to bind index buffer memory!");
-    }
+    createBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                 buffer, bufferMemory);
 
-    VkCommandBufferAllocateInfo allocInfoCmd{};
-    allocInfoCmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfoCmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfoCmd.commandPool = commandPool;
-    allocInfoCmd.commandBufferCount = 1;
-    VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(device, &allocInfoCmd, &commandBuffer);
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
-    VkBufferCopy copyRegion{};
-    copyRegion.srcOffset = 0;
-    copyRegion.dstOffset = 0;
-    copyRegion.size = size;
-    vkCmdCopyBuffer(commandBuffer, stagingBuffer, buffer, 1, &copyRegion);
-    vkEndCommandBuffer(commandBuffer);
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-    vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(graphicsQueue);
-    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+    copyBuffer(stagingBuffer, buffer, size);
+
     vkDestroyBuffer(device, stagingBuffer, nullptr);
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
-void VulkanBuffer::update(const void *data, int data_size)
+void VulkanBuffer::update(const void *data, int dataSize)
 {
-    VkDeviceSize sz = static_cast<VkDeviceSize>(data_size);
+    VkDeviceSize sz = static_cast<VkDeviceSize>(dataSize);
     if (hostVisible)
     {
-        void *mapped;
-        vkMapMemory(device, bufferMemory, 0, allocSize ? allocSize : sz, 0, &mapped);
-        std::memcpy(mapped, data, static_cast<size_t>(std::min<VkDeviceSize>(sz, allocSize ? allocSize : sz)));
-        if (allocSize && allocSize > sz)
-        {
-            std::memset(static_cast<char *>(mapped) + static_cast<size_t>(sz), 0, static_cast<size_t>(allocSize - sz));
-        }
-        vkUnmapMemory(device, bufferMemory);
+        VkDeviceSize copySize = allocSize ? std::min<VkDeviceSize>(sz, allocSize) : sz;
+        VkDeviceSize clearExtra = (allocSize && allocSize > sz) ? (allocSize - sz) : 0;
+        mapCopyUnmap(bufferMemory, 0, copySize, data, clearExtra);
         return;
     }
+
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
-    VkBufferCreateInfo stagingInfo{};
-    stagingInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    stagingInfo.size = sz;
-    stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    stagingInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    if (vkCreateBuffer(device, &stagingInfo, nullptr, &stagingBuffer) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create staging buffer");
-    }
-    VkMemoryRequirements stagingReq;
-    vkGetBufferMemoryRequirements(device, stagingBuffer, &stagingReq);
-    uint32_t hostTypeIndex = findMemoryType(stagingReq.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    VkMemoryAllocateInfo stagingAlloc{};
-    stagingAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    stagingAlloc.allocationSize = stagingReq.size;
-    stagingAlloc.memoryTypeIndex = hostTypeIndex;
-    if (vkAllocateMemory(device, &stagingAlloc, nullptr, &stagingBufferMemory) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to allocate staging buffer memory");
-    }
-    vkBindBufferMemory(device, stagingBuffer, stagingBufferMemory, 0);
-    void *mapped;
-    vkMapMemory(device, stagingBufferMemory, 0, sz, 0, &mapped);
-    std::memcpy(mapped, data, static_cast<size_t>(sz));
-    vkUnmapMemory(device, stagingBufferMemory);
+    createBuffer(sz, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer, stagingBufferMemory);
+    mapCopyUnmap(stagingBufferMemory, 0, sz, data, 0);
     copyBuffer(stagingBuffer, buffer, sz);
     vkDestroyBuffer(device, stagingBuffer, nullptr);
     vkFreeMemory(device, stagingBufferMemory, nullptr);
@@ -344,53 +230,6 @@ void VulkanBuffer::destroy()
         vkFreeMemory(device, bufferMemory, nullptr);
         bufferMemory = VK_NULL_HANDLE;
     }
-}
-
-VulkanBuffer::VulkanBuffer(VulkanBuffer&& other) noexcept
-    : device(other.device), physicalDevice(other.physicalDevice), graphicsQueue(other.graphicsQueue),
-      commandPool(other.commandPool), hostVisible(other.hostVisible), allocSize(other.allocSize),
-      buffer(other.buffer), bufferMemory(other.bufferMemory), size(other.size)
-{
-    other.device = VK_NULL_HANDLE;
-    other.physicalDevice = VK_NULL_HANDLE;
-    other.graphicsQueue = VK_NULL_HANDLE;
-    other.commandPool = VK_NULL_HANDLE;
-    other.hostVisible = false;
-    other.allocSize = 0;
-    other.buffer = VK_NULL_HANDLE;
-    other.bufferMemory = VK_NULL_HANDLE;
-    other.size = 0;
-}
-
-VulkanBuffer& VulkanBuffer::operator=(VulkanBuffer&& other) noexcept
-{
-    if (this != &other)
-    {
-        destroy();
-        if (commandPool)
-        {
-            vkDestroyCommandPool(device, commandPool, nullptr);
-        }
-        device = other.device;
-        physicalDevice = other.physicalDevice;
-        graphicsQueue = other.graphicsQueue;
-        commandPool = other.commandPool;
-        hostVisible = other.hostVisible;
-        allocSize = other.allocSize;
-        buffer = other.buffer;
-        bufferMemory = other.bufferMemory;
-        size = other.size;
-        other.device = VK_NULL_HANDLE;
-        other.physicalDevice = VK_NULL_HANDLE;
-        other.graphicsQueue = VK_NULL_HANDLE;
-        other.commandPool = VK_NULL_HANDLE;
-        other.hostVisible = false;
-        other.allocSize = 0;
-        other.buffer = VK_NULL_HANDLE;
-        other.bufferMemory = VK_NULL_HANDLE;
-        other.size = 0;
-    }
-    return *this;
 }
 
 VulkanBuffer::~VulkanBuffer()

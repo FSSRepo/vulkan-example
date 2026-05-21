@@ -77,14 +77,14 @@ SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurface
     return details;
 }
 
-bool checkDeviceExtensionSupport(VkPhysicalDevice device, std::vector<const char *> device_extensions) {
+bool checkDeviceExtensionSupport(VkPhysicalDevice device, std::vector<const char *> deviceExtensions) {
     uint32_t extensionCount;
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
 
     std::vector<VkExtensionProperties> availableExtensions(extensionCount);
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
 
-    std::set<std::string> requiredExtensions(device_extensions.begin(), device_extensions.end());
+    std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
 
     for (const auto& extension : availableExtensions) {
         requiredExtensions.erase(extension.extensionName);
@@ -104,13 +104,13 @@ bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface, std::vector
     return indices.isComplete() && extensionsSupported && swapChainAdequate;
 }
 
-VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, int default_width, int default_height) {
+VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, int defaultWidth, int defaultHeight) {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
         return capabilities.currentExtent;
     } else {
         VkExtent2D actualExtent = {
-            static_cast<uint32_t>(default_width),
-            static_cast<uint32_t>(default_height)
+            static_cast<uint32_t>(defaultWidth),
+            static_cast<uint32_t>(defaultHeight)
         };
 
         actualExtent.width = clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);

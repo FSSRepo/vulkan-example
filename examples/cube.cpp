@@ -1,43 +1,16 @@
 #include "vkApp.h"
 #include <iostream>
-#include <fstream>
 #include <cmath>
 #include <vector>
 #include <cstring>
 #include <array>
 #include <algorithm>
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "utils.h"
 
 #include "graphics_math.h"
 
 #define WIDTH 1280
 #define HEIGHT 720
-
-static std::vector<char> readFile(const std::string& filename) {
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
-    if (!file.is_open()) {
-        throw std::runtime_error("failed to open file!");
-    }
-    size_t fileSize = (size_t) file.tellg();
-    std::vector<char> buffer(fileSize);
-    file.seekg(0);
-    file.read(buffer.data(), fileSize);
-    file.close();
-    return buffer;
-}
-
-static std::vector<unsigned char> load_png_rgba(const char* filename, int &outW, int &outH) {
-    int n;
-    unsigned char* data = stbi_load(filename, &outW, &outH, &n, STBI_rgb_alpha);
-    if (!data) {
-        throw std::runtime_error("failed to load image with stb_image");
-    }
-    std::vector<unsigned char> pixels((size_t)outW * (size_t)outH * 4);
-    std::memcpy(pixels.data(), data, pixels.size());
-    stbi_image_free(data);
-    return pixels;
-}
 
 struct LightData { float position[4]; float color[4]; };
 struct GlobalUniform { float ProjView[16]; float camera[4]; LightData lights[3]; };
@@ -188,25 +161,30 @@ public:
     ModelUniform mdata{};
     Mat4 modelMatrix = Mat4::identity();
     Material material;
+
     int vertexCount = 0;
     int indexCount = 0;
+
     Vec3 _pos{0.0f, 0.0f, 0.0f};
     Vec3 _rot{0.0f, 0.0f, 0.0f};
-    void init(VulkanInstance &inst, const std::vector<float> &vertex_data, const std::vector<uint32_t> &index_data) {
-        buffer = VulkanBuffer(inst);
+
+    void init(VulkanInstance &instance, const std::vector<float> &vertex_data, const std::vector<uint32_t> &index_data) {
+        buffer = VulkanBuffer(instance);
         buffer.create(vertex_data.data(), static_cast<int>(vertex_data.size() * sizeof(float)), false);
         vertexCount = static_cast<int>(buffer.size / (sizeof(float) * 8));
-        indexBuffer = VulkanBuffer(inst);
+        indexBuffer = VulkanBuffer(instance);
         indexBuffer.createIndex(index_data.data(), static_cast<int>(index_data.size() * sizeof(uint32_t)));
         indexCount = static_cast<int>(index_data.size());
         updateMatrix();
         for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
-            modelUbo[i] = VulkanBuffer(inst);
+            modelUbo[i] = VulkanBuffer(instance);
             modelUbo[i].create(&mdata, sizeof(mdata), true);
         }
     }
+
     void setPosition(const Vec3 &p) { _pos = p; updateMatrix(); }
     void setRotation(const Vec3 &r) { _rot = r; updateMatrix(); }
+
     void render(VkCommandBuffer cmd, VkDevice device, ShaderModel &smodel, VulkanGraphicsPipeline &gpipe, uint32_t currentFrame) {
         std::memcpy(mdata.model, modelMatrix.data(), sizeof(mdata.model));
         modelUbo[currentFrame].update(&mdata, sizeof(mdata));
@@ -328,42 +306,13 @@ int main() {
     binding.binding = 0;
     binding.stride = sizeof(float) * 8;
     binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    VkVertexInputAttributeDescription attrs[3];
+    std::vector<VkVertexInputBindingDescription> vertexBindings = {binding};
+    std::vector<VkVertexInputAttributeDescription> attrs(3);
     attrs[0].location = 0; attrs[0].binding = 0; attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT; attrs[0].offset = 0;
     attrs[1].location = 1; attrs[1].binding = 0; attrs[1].format = VK_FORMAT_R32G32B32_SFLOAT; attrs[1].offset = sizeof(float)*3;
     attrs[2].location = 2; attrs[2].binding = 0; attrs[2].format = VK_FORMAT_R32G32_SFLOAT;  attrs[2].offset = sizeof(float)*6;
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.pVertexBindingDescriptions = &binding;
-    vertexInputInfo.vertexAttributeDescriptionCount = 3;
-    vertexInputInfo.pVertexAttributeDescriptions = attrs;
-
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-    VkPipelineViewportStateCreateInfo viewportState{};
-    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.viewportCount = 1;
-    viewportState.scissorCount = 1;
-
-    VkPipelineRasterizationStateCreateInfo rasterizer{};
-    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.depthClampEnable = VK_FALSE;
-    rasterizer.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-    rasterizer.depthBiasEnable = VK_FALSE;
-
-    VkGraphicsPipelineCreateInfo pipelineInfo{};
-    pipelineInfo.pVertexInputState = &vertexInputInfo;
-    pipelineInfo.pInputAssemblyState = &inputAssembly;
-    pipelineInfo.pViewportState = &viewportState;
-    gpipe.create(pipelineInfo);
+    gpipe.setVertexInput(vertexBindings, attrs);
+    gpipe.create();
 
     int texW = 1, texH = 1;
     std::vector<unsigned char> pixels;

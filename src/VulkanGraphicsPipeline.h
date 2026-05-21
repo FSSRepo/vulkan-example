@@ -11,13 +11,18 @@ class VulkanGraphicsPipeline {
     VkShaderModule vertShaderModule;
     VkShaderModule fragShaderModule;
     VulkanSwapchain swapChain;
-    
+
     bool useTexture = false;
     uint32_t uniformBindingCount = 0;
     bool depthOverride = false;
     bool depthDisable = false;
     bool ownsDescriptorSetLayout = false;
     VkDescriptorPool descriptorPool{};
+
+    std::vector<VkVertexInputBindingDescription> vertexBindings;
+    std::vector<VkVertexInputAttributeDescription> vertexAttributes;
+    VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    bool alphaBlendEnabled = false;
 
     public:
     VkDescriptorSetLayout descriptorSetLayout{};
@@ -27,7 +32,11 @@ class VulkanGraphicsPipeline {
 
     VulkanGraphicsPipeline(VulkanSwapchain swap, const std::vector<char>& vertex, const std::vector<char>& fragment);
 
-    void create(VkGraphicsPipelineCreateInfo & pipelineInfo);
+    void create();
+    void setVertexInput(const std::vector<VkVertexInputBindingDescription>& bindings,
+                        const std::vector<VkVertexInputAttributeDescription>& attributes);
+    void setTopology(VkPrimitiveTopology topology);
+    void enableAlphaBlending();
     void enableTexture();
     void enableUniformBuffer();
     void setUniformBufferBindingCount(uint32_t count);

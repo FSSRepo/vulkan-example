@@ -8,14 +8,14 @@ VulkanSwapchain::VulkanSwapchain(VulkanInstance instance)
     inst = instance;
 }
 
-void VulkanSwapchain::initalize(int default_width, int default_height, bool depth)
+void VulkanSwapchain::initalize(int defaultWidth, int defaultHeight, bool depth)
 {
     useDepth = depth;
     SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice, inst.surface);
 
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
-    VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities, default_width, default_height);
+    VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities, defaultWidth, defaultHeight);
 
     uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
     if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount)

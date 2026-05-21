@@ -18,7 +18,7 @@ VulkanInstance::VulkanInstance(bool debug)
 void VulkanInstance::createInstance(bool debug)
 {
     debugInstance = debug;
-    device_extensions.push_back("VK_KHR_swapchain");
+    deviceExtensions.push_back("VK_KHR_swapchain");
 
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -103,7 +103,7 @@ void VulkanInstance::initializeDevice()
 
     for (const auto &dev : devices)
     {
-        if (isDeviceSuitable(dev, surface, device_extensions))
+        if (isDeviceSuitable(dev, surface, deviceExtensions))
         {
             physicalDevice = dev;
             break;
@@ -142,8 +142,8 @@ void VulkanInstance::initializeDevice()
 
     createInfo.pEnabledFeatures = &deviceFeatures;
 
-    createInfo.enabledExtensionCount = static_cast<uint32_t>(device_extensions.size());
-    createInfo.ppEnabledExtensionNames = device_extensions.data();
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+    createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
     if (debugInstance)
     {

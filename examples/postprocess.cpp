@@ -1,11 +1,9 @@
 #include "vkApp.h"
 #include <iostream>
-#include <fstream>
 #include <cstring>
 #include <string>
 #include <cstddef>
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "utils.h"
 
 #include "graphics_math.h"
 
@@ -20,33 +18,8 @@ static uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFil
     throw std::runtime_error("failed to find suitable memory type");
 }
 
-static std::vector<unsigned char> load_png_rgba(const char* filename, int &outW, int &outH) {
-    int n;
-    unsigned char* data = stbi_load(filename, &outW, &outH, &n, STBI_rgb_alpha);
-    if (!data) {
-        throw std::runtime_error("failed to load image with stb_image");
-    }
-    std::vector<unsigned char> pixels((size_t)outW * (size_t)outH * 4);
-    std::memcpy(pixels.data(), data, pixels.size());
-    stbi_image_free(data);
-    return pixels;
-}
-
 #define WIDTH 800
 #define HEIGHT 600
-
-static std::vector<char> readFile(const std::string& filename) {
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
-    if (!file.is_open()) {
-        throw std::runtime_error("failed to open file!");
-    }
-    size_t fileSize = (size_t) file.tellg();
-    std::vector<char> buffer(fileSize);
-    file.seekg(0);
-    file.read(buffer.data(), fileSize);
-    file.close();
-    return buffer;
-}
 
 int main() {
     glfwInit();
@@ -345,42 +318,16 @@ int main() {
     bindingDescription.stride = sizeof(Vertex);
     bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-    VkVertexInputAttributeDescription attributeDescriptions[2];
-    attributeDescriptions[0].binding = 0;
-    attributeDescriptions[0].location = 0;
-    attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
-    attributeDescriptions[0].offset = static_cast<uint32_t>(offsetof(Vertex, position));
-    attributeDescriptions[1].binding = 0;
-    attributeDescriptions[1].location = 1;
-    attributeDescriptions[1].format = VK_FORMAT_R32G32_SFLOAT;
-    attributeDescriptions[1].offset = static_cast<uint32_t>(offsetof(Vertex, uv));
-
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-    vertexInputInfo.vertexAttributeDescriptionCount = 2;
-    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions;
-
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-    VkPipelineViewportStateCreateInfo viewportState{};
-    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.viewportCount = 1;
-    viewportState.scissorCount = 1;
-
-    VkPipelineRasterizationStateCreateInfo rasterizer{};
-    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.depthClampEnable = VK_FALSE;
-    rasterizer.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-    rasterizer.depthBiasEnable = VK_FALSE;
+    std::vector<VkVertexInputBindingDescription> postBindings = {bindingDescription};
+    std::vector<VkVertexInputAttributeDescription> postAttrs(2);
+    postAttrs[0].binding = 0;
+    postAttrs[0].location = 0;
+    postAttrs[0].format = VK_FORMAT_R32G32_SFLOAT;
+    postAttrs[0].offset = static_cast<uint32_t>(offsetof(Vertex, position));
+    postAttrs[1].binding = 0;
+    postAttrs[1].location = 1;
+    postAttrs[1].format = VK_FORMAT_R32G32_SFLOAT;
+    postAttrs[1].offset = static_cast<uint32_t>(offsetof(Vertex, uv));
 
     VkDescriptorSetLayoutBinding samplerLayoutBinding{};
     samplerLayoutBinding.binding = 0;
@@ -425,35 +372,22 @@ int main() {
     srcTexture.load(pixels.data(), texWidth, texHeight);
 
     
-    VkGraphicsPipelineCreateInfo pipeInfo{};
-    pipeInfo.pVertexInputState = &vertexInputInfo;
-    pipeInfo.pInputAssemblyState = &inputAssembly;
-    pipeInfo.pViewportState = &viewportState;
-
-    VkPipelineRasterizationStateCreateInfo rasterizer2{};
-    rasterizer2.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer2.depthClampEnable = VK_FALSE;
-    rasterizer2.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer2.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizer2.lineWidth = 1.0f;
-    rasterizer2.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer2.frontFace = VK_FRONT_FACE_CLOCKWISE;
-    rasterizer2.depthBiasEnable = VK_FALSE;
-    pipeInfo.pRasterizationState = &rasterizer2;
-
     VulkanGraphicsPipeline contrastPipe(chain, vertShaderCode, contrastFragCode);
     contrastPipe.enableTexture();
-    contrastPipe.create(pipeInfo);
+    contrastPipe.setVertexInput(postBindings, postAttrs);
+    contrastPipe.create();
 
     VulkanGraphicsPipeline brightnessPipe(chain, vertShaderCode, brightnessFragCode);
     brightnessPipe.enableTexture();
     brightnessPipe.setRenderPass(bloomRenderPass);
-    brightnessPipe.create(pipeInfo);
+    brightnessPipe.setVertexInput(postBindings, postAttrs);
+    brightnessPipe.create();
 
     VulkanGraphicsPipeline blurPipe(chain, vertShaderCode, blurFragCode);
     blurPipe.enableTexture();
     blurPipe.setRenderPass(bloomRenderPass);
-    blurPipe.create(pipeInfo);
+    blurPipe.setVertexInput(postBindings, postAttrs);
+    blurPipe.create();
 
     // Custom descriptor set layout for final bloom (2 textures)
     VkDescriptorSetLayout bloomFinalLayout{};
@@ -468,7 +402,8 @@ int main() {
     VulkanGraphicsPipeline bloomFinalPipe(chain, vertShaderCode, bloomFinalFragCode);
     bloomFinalPipe.enableTexture(); // Activa el uso de descriptores en el pipeline
     bloomFinalPipe.setDescriptorSetLayout(bloomFinalLayout);
-    bloomFinalPipe.create(pipeInfo);
+    bloomFinalPipe.setVertexInput(postBindings, postAttrs);
+    bloomFinalPipe.create();
 
     bool useBloom = false;
     glfwSetWindowUserPointer(window, &useBloom);
@@ -516,30 +451,14 @@ int main() {
     sceneBinding.binding = 0;
     sceneBinding.stride = sizeof(float) * 8;
     sceneBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    VkVertexInputAttributeDescription sceneAttrs[3];
-    sceneAttrs[0].location = 0; sceneAttrs[0].binding = 0; sceneAttrs[0].format = VK_FORMAT_R32G32B32_SFLOAT; sceneAttrs[0].offset = 0;
-    sceneAttrs[1].location = 1; sceneAttrs[1].binding = 0; sceneAttrs[1].format = VK_FORMAT_R32G32B32_SFLOAT; sceneAttrs[1].offset = sizeof(float)*3;
-    sceneAttrs[2].location = 2; sceneAttrs[2].binding = 0; sceneAttrs[2].format = VK_FORMAT_R32G32_SFLOAT;  sceneAttrs[2].offset = sizeof(float)*6;
-    VkPipelineVertexInputStateCreateInfo sceneVertexInput{};
-    sceneVertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    sceneVertexInput.vertexBindingDescriptionCount = 1;
-    sceneVertexInput.pVertexBindingDescriptions = &sceneBinding;
-    sceneVertexInput.vertexAttributeDescriptionCount = 3;
-    sceneVertexInput.pVertexAttributeDescriptions = sceneAttrs;
-    VkPipelineInputAssemblyStateCreateInfo sceneInput{};
-    sceneInput.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    sceneInput.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    sceneInput.primitiveRestartEnable = VK_FALSE;
-    VkPipelineViewportStateCreateInfo sceneViewportState{};
-    sceneViewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    sceneViewportState.viewportCount = 1;
-    sceneViewportState.scissorCount = 1;
-    VkGraphicsPipelineCreateInfo scenePipeInfo{};
-    scenePipeInfo.pVertexInputState = &sceneVertexInput;
-    scenePipeInfo.pInputAssemblyState = &sceneInput;
-    scenePipeInfo.pViewportState = &sceneViewportState;
+    std::vector<VkVertexInputBindingDescription> sceneBindings = {sceneBinding};
+    std::vector<VkVertexInputAttributeDescription> sceneAttrsVec(3);
+    sceneAttrsVec[0].location = 0; sceneAttrsVec[0].binding = 0; sceneAttrsVec[0].format = VK_FORMAT_R32G32B32_SFLOAT; sceneAttrsVec[0].offset = 0;
+    sceneAttrsVec[1].location = 1; sceneAttrsVec[1].binding = 0; sceneAttrsVec[1].format = VK_FORMAT_R32G32B32_SFLOAT; sceneAttrsVec[1].offset = sizeof(float)*3;
+    sceneAttrsVec[2].location = 2; sceneAttrsVec[2].binding = 0; sceneAttrsVec[2].format = VK_FORMAT_R32G32_SFLOAT;  sceneAttrsVec[2].offset = sizeof(float)*6;
+    scenePipe.setVertexInput(sceneBindings, sceneAttrsVec);
     scenePipe.setRenderPass(offRenderPass);
-    scenePipe.create(scenePipeInfo);
+    scenePipe.create();
 
     GlobalUniform3D sceneG{};
     VulkanBuffer sceneGUBO(inst);

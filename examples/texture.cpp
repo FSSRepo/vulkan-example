@@ -1,42 +1,9 @@
 #include "vkApp.h"
 #include <iostream>
-#include <fstream>
-#include <cstring>
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
-static std::vector<unsigned char> load_png_rgba(const char* filename, int &outW, int &outH) {
-    int n;
-    unsigned char* data = stbi_load(filename, &outW, &outH, &n, STBI_rgb_alpha);
-    if (!data) {
-        throw std::runtime_error("failed to load image with stb_image");
-    }
-    std::vector<unsigned char> pixels((size_t)outW * (size_t)outH * 4);
-    std::memcpy(pixels.data(), data, pixels.size());
-    stbi_image_free(data);
-    return pixels;
-}
+#include "utils.h"
 
 #define WIDTH 1280
 #define HEIGHT 720
-
-static std::vector<char> readFile(const std::string& filename) {
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
-
-    if (!file.is_open()) {
-        throw std::runtime_error("failed to open file!");
-    }
-
-    size_t fileSize = (size_t) file.tellg();
-    std::vector<char> buffer(fileSize);
-
-    file.seekg(0);
-    file.read(buffer.data(), fileSize);
-
-    file.close();
-
-    return buffer;
-}
 
 int main() {
     glfwInit();
@@ -61,37 +28,7 @@ int main() {
     VulkanGraphicsPipeline gpipe(chain, vertShaderCode, fragShaderCode);
     gpipe.enableTexture();
 
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
-
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-    VkPipelineViewportStateCreateInfo viewportState{};
-    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.viewportCount = 1;
-    viewportState.scissorCount = 1;
-
-    VkPipelineRasterizationStateCreateInfo rasterizer{};
-    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.depthClampEnable = VK_FALSE;
-    rasterizer.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-    rasterizer.depthBiasEnable = VK_FALSE;
-
-    VkGraphicsPipelineCreateInfo pipelineInfo{};
-    pipelineInfo.pVertexInputState = &vertexInputInfo;
-    pipelineInfo.pInputAssemblyState = &inputAssembly;
-    pipelineInfo.pViewportState = &viewportState;
-
-    gpipe.create(pipelineInfo);
+    gpipe.create();
 
     int texWidth, texHeight;
     auto pixels = load_png_rgba("texture.jpg", texWidth, texHeight);

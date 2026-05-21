@@ -3,6 +3,7 @@
 
 #include "vkCommon.h"
 #include "VulkanInstance.h"
+#include "vkUtils.h"
 
 class VulkanBuffer {
     private:
@@ -10,25 +11,28 @@ class VulkanBuffer {
     VkPhysicalDevice physicalDevice{};
     VkQueue graphicsQueue{};
     VkCommandPool commandPool{};
+    QueueFamilyIndices qFamilyIndices;
+
     bool hostVisible = false;
     VkDeviceSize allocSize = 0;
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory, VkDeviceSize* outAllocSize = nullptr);
+    void mapCopyUnmap(VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize dataSize, const void* data, VkDeviceSize clearExtra);
     void copyBuffer(VkBuffer src, VkBuffer dst, VkDeviceSize size);
+    void createCommandPool();
+    void ensureCommandPool();
+    
     public:
     VkBuffer buffer{};
     VkDeviceMemory bufferMemory{};
     VkDeviceSize size{};
     VulkanBuffer() {}
     VulkanBuffer(VulkanInstance instance);
-    VulkanBuffer(const VulkanBuffer&) = delete;
-    VulkanBuffer& operator=(const VulkanBuffer&) = delete;
-    VulkanBuffer(VulkanBuffer&& other) noexcept;
-    VulkanBuffer& operator=(VulkanBuffer&& other) noexcept;
     VkCommandBuffer beginSingleTimeCommands();
     void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-    void create(const void* data, int data_size, bool uniform_buffer);
-    void createIndex(const void* data, int data_size);
-    void update(const void* data, int data_size);
+    void create(const void* data, int dataSize, bool uniformBuffer);
+    void createIndex(const void* data, int dataSize);
+    void update(const void* data, int dataSize);
     void destroy();
     ~VulkanBuffer();
 };

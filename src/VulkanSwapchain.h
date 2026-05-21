@@ -32,7 +32,7 @@ class VulkanSwapchain {
     VkDeviceMemory depthImageMemory{};
     VkImageView depthImageView{};
 
-    void initalize(int default_width, int default_height, bool depth);
+    void initalize(int defaultWidth, int defaultHeight, bool depth);
     void destroy();
 };
 

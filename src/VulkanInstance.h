@@ -6,7 +6,7 @@
 class VulkanInstance {
     private:
     VkInstance instance;
-    std::vector<const char *> device_extensions;
+    std::vector<const char *> deviceExtensions;
     bool debugInstance;
 
     void createInstance(bool debug);
